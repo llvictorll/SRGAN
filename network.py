@@ -72,3 +72,38 @@ class NetD(nn.Module):
         x = F.leaky_relu(self.batch3(self.conv4(x)), 0.2)
         x = self.conv5(x)
         return x.squeeze()
+
+
+class NetD_patch(nn.Module):
+    def __init__(self):
+        super(NetD_patch, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=2, stride=2, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=2, stride=2, padding=0, bias=False)
+        self.conv4 = nn.Conv2d(256, 512, kernel_size=2, stride=2, padding=0, bias=False)
+        self.conv5 = nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv6 = nn.Conv2d(512, 256, kernel_size=2, stride=2, padding=0, bias=False)
+        self.conv7 = nn.Conv2d(256, 1, kernel_size=1, stride=1, padding=0, bias=False)
+
+        self.batch1 = nn.BatchNorm2d(128, affine=False)
+        self.batch2 = nn.BatchNorm2d(256, affine=False)
+        self.batch3 = nn.BatchNorm2d(512, affine=False)
+
+    def forward(self, x):
+        #print(x.size())
+        x = F.leaky_relu(self.conv1(x), 0.2)
+        #print(x.size())
+        x = F.leaky_relu(self.batch1(self.conv2(x)), 0.2)
+        #print(x.size())
+        x = F.leaky_relu(self.batch2(self.conv3(x)), 0.2)
+        #print(x.size())
+        x = F.leaky_relu(self.batch3(self.conv4(x)), 0.2)
+        #print(x.size())
+        x = F.leaky_relu(self.batch3(self.conv5(x)), 0.2)
+        #print(x.size())
+        x = F.leaky_relu(self.batch2(self.conv6(x)), 0.2)
+        x = self.conv7(x)
+        #print(x.size())
+        x = x.reshape(-1)
+        #print(x.size())
+        return x

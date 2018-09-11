@@ -16,14 +16,14 @@ ex = Experiment('test')
 def conf():
     device = 'cuda:0'
     netG = NetG().cuda()
-    netD = NetD().cuda()
+    netD = NetD_patch().cuda()
     optimizerG = optim.Adam(netG.parameters(), 0.0002, betas=(0.5, 0.999))
-    optimizerD = optim.Adam(netD.parameters(), 0.0001, betas=(0.5, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), 0.0004, betas=(0.5, 0.999))
     epoch = 100
     cuda = True
     f_bruit = Sup_res2
     param = None
-    file = 'SRGAN/youtube_no_patch'
+    file = 'SRGAN/SRGAN_base'
     f = f_bruit(param)
     trainset = CelebADataset2("/net/girlschool/besnier/CelebA_dataset/train",
                              f,
@@ -67,8 +67,8 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
     for e in bar_epoch:
         for i, (xhq, xlq) in zip(tqdm(range(len(trainloader))), trainloader):
 
-            real_label = torch.FloatTensor(xlq.size(0)).fill_(.9)
-            fake_label = torch.FloatTensor(xlq.size(0)).fill_(.1)
+            real_label = torch.FloatTensor(xlq.size(0)*4*4).fill_(.9)
+            fake_label = torch.FloatTensor(xlq.size(0)*4*4).fill_(.1)
 
             if cuda:
                 real_label = real_label.cuda()
@@ -99,6 +99,7 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
             lossMSE = F.mse_loss(outputG, xhq)
 
             (0.01*lossGAN+lossMSE).backward()
+            # lossMSE.backward()
             optimizerG.step()
             dTrue.append(F.sigmoid(outputTrue).data.mean())
             dFalse.append(F.sigmoid(outputFalse).data.mean())
@@ -111,7 +112,7 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
                 testbar = tqdm(range(len(testloaderY)))
                 mse_test = []
                 ref = []
-                for j, (xhqt, xlqt) in zip(testbar, testloaderY):
+                for j, (xhqt, xlqt) in zip(testbar, testloader):
                     if j > 100:
                         break
                     if turn:
@@ -142,11 +143,9 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
                 dTrue = []
                 dFalse = []
 
-
-
     for g in optimizerD.param_groups:
-        g['lr'] = g['lr']*0.9
+        g['lr'] = g['lr']*0.99
     for g in optimizerG.param_groups:
-        g['lr'] = g['lr'] * 0.9
+        g['lr'] = g['lr'] * 0.99
 
 

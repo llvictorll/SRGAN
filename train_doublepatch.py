@@ -4,26 +4,24 @@ import torchvision.transforms as transforms
 from utils import *
 from module_bruit import F_bruit, Patch_block, Sup_res1, Sup_res2
 from sacred import Experiment
-from sacred.observers import MongoObserver
 from module_bruit import F_bruit, Patch_block, Sup_res1, Sup_res2
 from tqdm import tqdm
 from dataset import *
-
+from itertools import zip_longest
 ex = Experiment('test')
-#ex.observers.append(MongoObserver.create(url='mongodb://besnier:XXXXX@drunk',db_name='VictorSacred'))
 
 @ex.config
 def conf():
     device = 'cuda:0'
     netG = NetG().cuda()
-    netD = NetD().cuda()
+    netD = NetD_patch().cuda()
     optimizerG = optim.Adam(netG.parameters(), 0.0002, betas=(0.5, 0.999))
-    optimizerD = optim.Adam(netD.parameters(), 0.0001, betas=(0.5, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), 0.0004, betas=(0.5, 0.999))
     epoch = 100
     cuda = True
     f_bruit = Sup_res2
     param = None
-    file = 'SRGAN/youtube_no_patch'
+    file = 'SRGAN/double_patch'
     f = f_bruit(param)
     trainset = CelebADataset2("/net/girlschool/besnier/CelebA_dataset/train",
                              f,
@@ -51,10 +49,20 @@ def conf():
                                                             transforms.ToTensor(),
                                                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                                             ]))
-    testloaderY = torch.utils.data.DataLoader(datasetYtrain, batch_size=64, shuffle=True, num_workers=1, drop_last=True)
+    trainloaderY = torch.utils.data.DataLoader(datasetYtrain, batch_size=64, shuffle=True, num_workers=1, drop_last=True)
+
+    datasetYtest = YoutubeFacesDataset("/net/girlschool/besnier/YoutubeFaces",
+                                        f,
+                                        80,
+                                        0,
+                                        transforms.Compose([transforms.Resize(64),
+                                                            transforms.ToTensor(),
+                                                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                                            ]))
+    testloaderY = torch.utils.data.DataLoader(datasetYtest, batch_size=64, shuffle=True, num_workers=1, drop_last=True)
 
 @ex.automain
-def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimizerG, optimizerD, file):
+def main(netG, netD, epoch, cuda, trainloader, trainloaderY, testloader, testloaderY, optimizerG, optimizerD, file):
     netG.train()
     netD.train()
     sauvegarde_init(file)
@@ -65,16 +73,19 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
     turn = True
     bar_epoch = tqdm(range(epoch))
     for e in bar_epoch:
-        for i, (xhq, xlq) in zip(tqdm(range(len(trainloader))), trainloader):
+        for i, (xhq, xlq), (xy, xby) in zip_longest(tqdm(range(len(trainloaderY))), trainloader, trainloaderY):
+            if xhq is None:
+                break
 
-            real_label = torch.FloatTensor(xlq.size(0)).fill_(.9)
-            fake_label = torch.FloatTensor(xlq.size(0)).fill_(.1)
+            real_label = torch.FloatTensor(xlq.size(0)*4*4).fill_(.9)
+            fake_label = torch.FloatTensor(xlq.size(0)*4*4).fill_(.1)
 
             if cuda:
                 real_label = real_label.cuda()
                 fake_label = fake_label.cuda()
                 xlq = xlq.cuda()
                 xhq = xhq.cuda()
+                xby = xby.cuda()
 
             # train D
             optimizerD.zero_grad()
@@ -87,7 +98,10 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
             fake = netG(xlq)
             outputFalse = netD(fake)
             lossDF = F.binary_cross_entropy_with_logits(outputFalse, fake_label)
-            (lossDF + lossDT).backward()
+            fake2 = netG(xby)
+            outputFalse2 = netD(fake2)
+            lossDF2 = F.binary_cross_entropy_with_logits(outputFalse2, fake_label)
+            (0.5*lossDF2 +0.5*lossDF + lossDT).backward()
             optimizerD.step()
 
             # train G
@@ -96,9 +110,12 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
             outputG = netG(xlq)
             outputDG = netD(outputG)
             lossGAN = F.binary_cross_entropy_with_logits(outputDG, real_label)
-            lossMSE = F.mse_loss(outputG, xhq)
+            outputG2 = netG(xby)
+            outputDG2 = netD(outputG2)
+            lossGAN2 = F.binary_cross_entropy_with_logits(outputDG2, real_label)
+            lossMSE = F.l1_loss(outputG, xhq)
 
-            (0.01*lossGAN+lossMSE).backward()
+            (0.01*lossGAN2+0.01*lossGAN+lossMSE).backward()
             optimizerG.step()
             dTrue.append(F.sigmoid(outputTrue).data.mean())
             dFalse.append(F.sigmoid(outputFalse).data.mean())
@@ -142,11 +159,9 @@ def main(netG, netD, epoch, cuda, trainloader, testloader, testloaderY, optimize
                 dTrue = []
                 dFalse = []
 
-
-
     for g in optimizerD.param_groups:
-        g['lr'] = g['lr']*0.9
+        g['lr'] = g['lr']*0.99
     for g in optimizerG.param_groups:
-        g['lr'] = g['lr'] * 0.9
+        g['lr'] = g['lr'] * 0.99
 
 

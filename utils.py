@@ -12,22 +12,22 @@ def imshow(img):
 
 def printG(x, k, netG,file):
     o = netG(x)
-    scipy.misc.imsave('/net/girlschool/besnier/'+file+'/g{}.png'.format(k), imshow(vutils.make_grid(o.data)))
+    scipy.misc.imsave('/local/besnier/'+file+'/g{}.png'.format(k), imshow(vutils.make_grid(o.data)))
 
 
 def print_img(x, name, file):
-    scipy.misc.imsave('/net/girlschool/besnier/'+file +'/'+ name + '.png', imshow(vutils.make_grid(x).data))
+    scipy.misc.imsave('/local/besnier/'+file +'/'+ name + '.png', imshow(vutils.make_grid(x).data))
 
 
 def sauvegarde_init(file):
-    if not os.path.exists("/net/girlschool/besnier/"+file):
-        os.mkdir("/net/girlschool/besnier/"+file)
-    with open("/net/girlschool/besnier/"+file+"/res.csv", 'a') as f:
-        f.write('dTrue' + '\t' + 'dFalse' + '\t' + 'qualité' + '\t' + 'référence' + '\n')
+    if not os.path.exists("/local/besnier/"+file):
+        os.makedirs("/local/besnier/"+file)
+    with open("/local/besnier/"+file+"/res.csv", 'a') as f:
+        f.write('dTrue' + '\t' + 'dFalse' + '\t' + 'qualité_test' + '\t' + 'qualité_train' + '\t' + 'référence' + '\n')
 
 
 def sauvegarde(file, *agr):
-    with open("/net/girlschool/besnier/"+file+"/res.csv", 'a') as f:
+    with open("/local/besnier/"+file+"/res.csv", 'a') as f:
         for a in agr:
             f.write(str(a) + '\t')
         f.write('\n')
